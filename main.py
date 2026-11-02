@@ -5,17 +5,19 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+
 import yt_dlp
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart 
+from aiogram.filters import CommandStart
 from aiogram.types import FSInputFile, Message
+from aiohttp import web
 
-# Tokenni to'g'ri olish (os.getenv da ichiga to'g'ridan-to'g'ri token yozilmaydi)
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8607280759:AAFJCl2KGPJsfhAmh6dbNb3ijAKxhI4bgRA")
-MAX_SIZE = 50 * 1024 * 1024
+PORT = int(os.getenv("PORT", "10000"))
+MAX_SIZE = 50 * 1024 * 1024  # Telegram bot limiti: 50 MB
 
-# Cookies faylidan foydalanish uchun (agar kerak bo'lmasa None qoldirasiz)
-COOKIES_FILE = os.getenv("COOKIES_FILE", None)
+# YouTube uchun ixtiyoriy cookies fayli (Render Secret File yoki yo'l)
+COOKIES_FILE = os.getenv("COOKIES_FILE")
 
 URL_RE = re.compile(
     r"https?://(?:www\.|m\.)?(?:instagram\.com|youtube\.com|youtu\.be)/\S+"
@@ -25,12 +27,14 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 logging.basicConfig(level=logging.INFO)
 dp = Dispatcher()
 
+
 def download(url: str, out_dir: str) -> Path:
     opts = {
         "outtmpl": f"{out_dir}/%(id)s.%(ext)s",
         "format": "b[ext=mp4][filesize<?50M]/b[filesize<?50M]/b",
         "noplaylist": True,
         "quiet": True,
+        "noprogress": True,
         "max_filesize": MAX_SIZE,
     }
     if COOKIES_FILE and os.path.exists(COOKIES_FILE):
@@ -58,7 +62,7 @@ async def handle_link(message: Message):
     if not match:
         return
     url = match.group(0)
-    
+
     status = await message.answer("⏳ Yuklanmoqda...")
     tmp = tempfile.mkdtemp()
 
@@ -78,7 +82,10 @@ async def handle_link(message: Message):
 
     except Exception as e:
         logging.exception("Download error")
-        await status.edit_text(f"❌ Xatolik: {str(e)[:200]}")
+        text = str(e)
+        if "Sign in to confirm" in text or "429" in text:
+            text = "YouTube serverni blokladi. Keyinroq urinib ko'ring yoki Instagram link yuboring."
+        await status.edit_text(f"❌ Xatolik: {text[:200]}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -88,9 +95,30 @@ async def other(message: Message):
     await message.answer("Instagram yoki YouTube link yuboring.")
 
 
+async def health(_: web.Request) -> web.Response:
+    return web.Response(text="ok")
+
+
+async def start_web_server() -> web.AppRunner:
+    """Render Web Service port kutadi, shuning uchun kichik server ochamiz."""
+    app = web.Application()
+    app.router.add_get("/", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "0.0.0.0", PORT).start()
+    logging.info("Health server port %s da ishlamoqda", PORT)
+    return runner
+
+
 async def main():
+    runner = await start_web_server()
     bot = Bot(BOT_TOKEN)
-    await dp.start_polling(bot)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
+        await runner.cleanup()
 
 
 if __name__ == "__main__":
