@@ -17,7 +17,12 @@ PORT = int(os.getenv("PORT", "10000"))
 MAX_SIZE = 50 * 1024 * 1024  # Telegram bot limiti: 50 MB
 
 # YouTube uchun ixtiyoriy cookies fayli (Render Secret File yoki yo'l)
-COOKIES_FILE = os.getenv("COOKIES_FILE")
+_secret = os.getenv("COOKIES_FILE", "/etc/secrets/cookies.txt")
+COOKIES_FILE = None
+if os.path.exists(_secret):
+    # Render Secret Files faqat o'qish uchun, yt-dlp esa yozishi mumkin -> nusxa olamiz
+    COOKIES_FILE = os.path.join(tempfile.gettempdir(), "cookies.txt")
+    shutil.copyfile(_secret, COOKIES_FILE)
 
 URL_RE = re.compile(
     r"https?://(?:www\.|m\.)?(?:instagram\.com|youtube\.com|youtu\.be)/\S+"
