@@ -31,7 +31,7 @@ except Exception:  # pragma: no cover
     FFMPEG = shutil.which("ffmpeg")
 
 # Token faqat Render -> Environment ichida saqlanadi (kodda yozilmaydi!)
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+BOT_TOKEN = os.environ["BOT_TOKEN", "8607280759:AAFJCl2KGPJsfhAmh6dbNb3ijAKxhI4bgRA"]
 PORT = int(os.getenv("PORT", "10000"))
 MAX_SIZE = 50 * 1024 * 1024  # Telegram bot limiti: 50 MB
 SEARCH_COUNT = 8
