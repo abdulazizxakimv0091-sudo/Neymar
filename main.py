@@ -30,7 +30,8 @@ except Exception:  # pragma: no cover
     Shazam = None
     FFMPEG = shutil.which("ffmpeg")
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8607280759:AAFJCl2KGPJsfhAmh6dbNb3ijAKxhI4bgRA")
+# Token faqat Render -> Environment ichida saqlanadi (kodda yozilmaydi!)
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 PORT = int(os.getenv("PORT", "10000"))
 MAX_SIZE = 50 * 1024 * 1024  # Telegram bot limiti: 50 MB
 SEARCH_COUNT = 8
@@ -118,6 +119,9 @@ async def identify(src: str):
         try:
             await asyncio.to_thread(extract_audio, src, wav, start)
             out = await shazam.recognize(wav)
+        except RuntimeError:
+            # Video qisqa yoki audio yo'q: normal holat
+            continue
         except Exception:
             logging.exception("Identify error")
             continue
